@@ -1,6 +1,6 @@
 # Cattle drone sim: preview
 
-A synthetic scene for drone perception: Gumtree Creek Station, a fictional beef cattle property in the Queensland dry tropics, built and rendered in NVIDIA Isaac Sim. The source code is private. This repository holds the site map, a short clip of the render outputs and a note on how they were made.
+A synthetic scene for drone perception: Gumtree Creek Station, a fictional beef cattle property in the Queensland dry tropics, built and rendered in NVIDIA Isaac Sim. The source code is private. This repository holds the site map, a short clip of the render outputs, a note on how they were made, and a check of a pretrained cattle detector on labelled drone photos.
 
 ## Why simulation
 
@@ -24,6 +24,35 @@ A drone that musters cattle has to find, count and track them from the air. Open
 One sample from each dataset, with its licence.
 
 The training data comes from simulation, with Gumtree Creek Station as its testing ground. Every frame rendered here comes with exact class and instance masks, depth, simulated thermal and lidar. The camera, height, light and herd can be changed, and the same flight can be replayed. The real sets above are for fine-tuning and the real-world test.
+
+## Pretrained detector on labelled drone photos
+
+A check of a ready-made cattle detector on real labelled photos.
+
+- Data: ICAERUS v2, farm Mauron, France, 7 Nov 2023, 15:49:10-15:49:20. 13 photos from a DJI Mavic 3E at 60 m, about one per second. 156 labelled boxes of 12 cattle.
+- Detector: the YOLO11s cattle model of Yan et al. 2026 ([weights](https://huggingface.co/Arvin26/Cattle-detection-model)), trained on a Brazilian feedlot at 10-15 m, run on 640 px SAHI tiles.
+- Metric: precision, recall and F1 per photo at IoU 0.5. Cattle found: tracks matched to the 12 labelled animals.
+
+[![The detector check: photo with zones, tracked cattle and the flight map](pretrained_check.jpg)](pretrained_check.mp4)
+
+[`pretrained_check.mp4`](pretrained_check.mp4): 15 s, the 13 photos at the real pace between a title and the result. Red: detection with confidence 0.25 or more. Amber: weaker detection near a track. Cyan: re-detected. Inset: map built from the 113 photos of the flight, with the area of the current photo.
+
+| Step | Precision | Recall | F1 | Cattle found |
+|---|---|---|---|---|
+| Naive: detector on each photo, confidence 0.25 or more | 0.59 | 0.40 | 0.48 | - |
+| + only the field before the road | 0.89 | 0.40 | 0.56 | - |
+| + tracking on the ground | 0.89 | 0.40 | 0.56 | 9 of 12 |
+| + memory: weaker detections near a track | 0.85 | 0.53 | 0.65 | 11 of 12 |
+| + re-detection in a turned crop | 0.85 | 0.56 | 0.67 | 11 of 12 |
+
+How F1 went from 0.48 to 0.67:
+
+- Zone filter. The road is found in the photos by colour and fitted as a curve on the ground. Detections on the road and beyond it are dropped. Precision 0.59 to 0.89.
+- Tracking on the ground. Poses come from COLMAP over the 113 photos of the flight, aligned to GPS (0.36 m median residual), with the DJI lens calibration. Each detection becomes a point in metres; a Kalman filter links the points across photos.
+- Memory. A track predicts where its animal should be and accepts detections down to confidence 0.02 there. Recall 0.40 to 0.53.
+- Re-detection. A track without a detection is searched again in a 640 px crop centred on its prediction and turned to the orientation of its last confident photo. Recall 0.53 to 0.56.
+
+Thresholds were chosen on other ICAERUS flights, not on this window. The detector still misses 44% of the cattle per photo.
 
 ## Render outputs
 
@@ -83,7 +112,9 @@ The site map is drawn with matplotlib from the same layout, over synthetic image
 | Drone raw images of cattle in french grazing areas (collage) | Adrien Lebreton | [Zenodo 8234156](https://zenodo.org/records/8234156) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | One photo resized |
 | Drone videos and their annotations of passing sheep (collage) | Louise Helary and co-authors | [Zenodo 12094356](https://zenodo.org/records/12094356) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | One video frame resized |
 | Drone videos to test sheep counting computer vision pipeline (collage) | Adrien Lebreton and co-authors | [Zenodo 18889878](https://zenodo.org/records/18889878) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | One video frame resized |
+| Drone images and their annotations of grazing cows (detector check) | Louise Helary, Adrien Lebreton | [Zenodo 11048412](https://zenodo.org/records/11048412) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 13 photos undistorted and resized, zones and boxes drawn; flight map built from 113 photos |
+| Cattle detection model, YOLO11s (detector check) | Jianglong Yan and co-authors | [Hugging Face](https://huggingface.co/Arvin26/Cattle-detection-model) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Used as is |
 
 ## Licence
 
-The map, the clip, the preview image and the scene stills are released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). When you reuse them, also credit the third-party assets above. The dataset collage `datasets.jpg` stays under the licences of its sources, listed above. The AerialCattle2017 crops and the Shao et al. sample are for non-commercial use only. The ACFR and NelloreBeefCattleDataset samples have no stated licence.
+The map, the clip, the preview image and the scene stills are released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The detector check video and still `pretrained_check.*` are released under CC BY 4.0 as well and contain ICAERUS photos (CC BY 4.0). When you reuse them, also credit the third-party assets above. The dataset collage `datasets.jpg` stays under the licences of its sources, listed above. The AerialCattle2017 crops and the Shao et al. sample are for non-commercial use only. The ACFR and NelloreBeefCattleDataset samples have no stated licence.
